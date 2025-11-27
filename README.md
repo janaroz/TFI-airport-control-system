@@ -80,23 +80,3 @@ No requiere instalación ni dependencias locales.
 ## Créditos
 
 - UTN FRBA, Teoría de Control K-4572
-- Chart.js para visualización de datos
-
----
-
-## Preguntas Frecuentes
-
-**No se ve el gráfico o la página parece rota**  
-> Verifica abrir el archivo HTML **localmente en tu navegador**. Desde GitHub solo ves el código, no se ejecuta el JS.
-
-**¿Dónde veo el archivo en GitHub Pages?**  
-> Abre la a URL  
-> `https://<usuario>.github.io/<repo>/simulacion-18.html`  
-> (Reemplaza `<usuario>` y `<repo>` por tus datos reales)
-
----
-
-## Licencia
-
-Uso educativo y sin fines de lucro.  
-Puedes modificar y reutilizar este código citando los autores originales.
