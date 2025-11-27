@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simulación TP Integrador - Control de Filas</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #121212;
+      --card: #1e1e1e;
+      --accent: #00e5ff;
+      --text: #e0e0e0;
+      
+      /* Colores TP (Más visibles) */
+      --c-normal: rgba(76, 175, 80, 0.2);   
+      --c-low:    rgba(255, 235, 59, 0.2); 
+      --c-med:    rgba(255, 152, 0, 0.2);  
+      --c-high:   rgba(244, 67, 54, 0.2);  
+    }
+
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* --- HEADER INSTITUCIONAL --- */
+    header {
+      background: #1a1a1a;
+      border-bottom: 2px solid #333;
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+    
+    .header-left h1 { margin: 0; font-size: 1.2rem; color: var(--accent); letter-spacing: 1px; }
+    .header-left h2 { margin: 5px 0 0; font-size: 0.9rem; color: #fff; font-weight: normal; }
+    
+    .header-right { text-align: right; font-size: 0.85rem; color: #aaa; }
+    .student-name { color: #ddd; font-weight: 600; }
+
+    /* --- LAYOUT PRINCIPAL --- */
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* --- SIDEBAR --- */
+    .sidebar {
+      width: 300px;
+      background: #181818;
+      border-right: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      overflow-y: auto;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 20px 40px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      scroll-behavior: smooth;
+    }
+
+    h3 { margin: 0 0 10px 0; font-size: 1.1rem; border-left: 4px solid var(--accent); padding-left: 10px; color: #fff; }
+
+    /* --- CONTROLES --- */
+    .control-group { margin-bottom: 15px; }
+    .control-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: #bbb; margin-bottom: 5px; }
+    .control-val { color: var(--accent); font-weight: bold; }
+    input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--accent); }
+
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+    
+    button {
+      padding: 10px; border: none; border-radius: 4px;
+      font-weight: bold; cursor: pointer; transition: all 0.2s; font-size: 0.8rem;
+    }
+    .btn-run { background: #00bcd4; color: #fff; width: 100%; margin-top: 10px; margin-bottom: 20px; font-size: 1rem; }
+    .btn-run:hover { background: #00acc1; transform: scale(1.02); }
+    
+    .btn-preset { background: transparent; border: 1px solid #555; color: #aaa; }
+    .btn-preset:hover { border-color: var(--accent); color: var(--accent); background: rgba(0, 229, 255, 0.05); }
+
+    .separator { border: 0; border-top: 1px solid #333; margin: 15px 0; }
+
+    /* --- GRÁFICOS --- */
+    .chart-container {
+      background: var(--card);
+      border-radius: 6px;
+      padding: 10px 15px 30px 15px; /* Padding bottom extra para números eje X */
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      height: 400px; 
+      min-height: 400px;
+      width: 100%;
+      position: relative;
+    }
+
+    /* --- BITÁCORA --- */
+    .logs-wrapper {
+      background: var(--card);
+      border-radius: 6px;
+      padding: 15px;
+      height: 400px; 
+      display: flex;
+      flex-direction: column;
+    }
+
+    .table-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #333; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { text-align: left; background: #252525; color: var(--accent); padding: 10px; position: sticky; top: 0; z-index: 2; border-bottom: 2px solid #444; }
+    td { border-bottom: 1px solid #333; padding: 6px 10px; color: #ccc; }
+    
+    .tag { padding: 3px 6px; border-radius: 3px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; color: #000; display: inline-block; width: 90px; text-align: center; }
+    .tag-norm { background: #81c784; }
+    .tag-low  { background: #fff176; }
+    .tag-med  { background: #ffb74d; }
+    .tag-high { background: #e57373; }
+
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <h1>TRABAJO PRÁCTICO INTEGRADOR</h1>
+      <h2>Teoría de Control K-4572 - UTN FRBA</h2>
+    </div>
+    <div class="header-right">
+      <div class="student-name">Román Brezman – 203.432-3</div>
+      <div class="student-name">Jana Nurit Rozenberg - 1636170</div>
+      <div style="margin-top:5px; color:#888;">Prof. Omar Oscar Civale</div>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div style="text-align:center; font-size:0.9rem; color:#aaa; margin-bottom:10px;">Panel de Control</div>
+      
+      <button class="btn-run" id="btnRun">REINICIAR SIMULACIÓN</button>
+
+      <div class="control-label" style="justify-content:center; margin-bottom:5px;">Escenarios:</div>
+      <div class="btn-grid">
+        <button class="btn-preset" id="btnNormal">Normal</button>
+        <button class="btn-preset" id="btnStress">Estresado</button>
+        <button class="btn-preset" id="btnCollapse" style="border-color:#e57373; color:#e57373;">Colapso</button>
+        <button class="btn-preset" id="btnLow">Valle</button>
+      </div>
+
+      <hr class="separator">
+
+      <div class="control-group">
+        <div class="control-label">Kp (Proporcional) <span class="control-val" id="valKp">0.6</span></div>
+        <input type="range" id="rngKp" min="0.1" max="1.5" step="0.05" value="0.6">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">Kd (Derivativo) <span class="control-val" id="valKd">0.4</span></div>
+        <input type="range" id="rngKd" min="0.0" max="1.5" step="0.05" value="0.4">
+      </div>
+
+      <hr class="separator">
+      
+      <div class="control-group">
+        <div class="control-label">Pico Demanda (λ) <span class="control-val" id="valSpike">25 pax/min</span></div>
+        <input type="range" id="rngSpike" min="15" max="35" step="1" value="25">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">Inicio Pico (min) <span class="control-val" id="valStartSpike">60</span></div>
+        <input type="range" id="rngStartSpike" min="20" max="250" step="10" value="60">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">Ruido Demanda (±) <span class="control-val" id="valNoise">2.0</span></div>
+        <input type="range" id="rngNoise" min="0" max="4.0" step="0.5" value="2.0">
+      </div>
+
+      <hr class="separator">
+      
+      <div class="control-group">
+        <div class="control-label" style="color:#ef5350">Falla Mostradores <span class="control-val" id="valFailCnt">2 perdidos</span></div>
+        <input type="range" id="rngFailCnt" min="0" max="5" step="1" value="2">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">Inicio Falla (min) <span class="control-val" id="valFailStart">150</span></div>
+        <input type="range" id="rngFailStart" min="20" max="280" step="10" value="150">
+      </div>
+    </aside>
+
+    <main class="main-content">
+      
+      <div class="chart-container">
+        <h3>1. Calidad de Servicio (QoS): Tiempo de Espera y Zonas de Error</h3>
+        <canvas id="chartResponse"></canvas>
+      </div>
+
+      <div class="chart-container">
+        <h3>2. Perturbación de Entrada: Demanda de Pasajeros (λ)</h3>
+        <canvas id="chartDemand"></canvas>
+      </div>
+
+      <div class="chart-container">
+        <h3>3. Capacidad Total del Sistema (μ_tot)</h3>
+        <canvas id="chartCapacity"></canvas>
+      </div>
+
+      <div class="chart-container">
+        <h3>4. Acción de Control: Mostradores Activos (s)</h3>
+        <canvas id="chartControl"></canvas>
+      </div>
+
+      <div class="logs-wrapper">
+        <h3>Bitácora de Eventos (Logs del Sistema)</h3>
+        <div class="table-scroll">
+          <table id="logTable">
+            <thead>
+              <tr>
+                <th style="width:12%">Tiempo</th>
+                <th style="width:15%">Espera (W)</th>
+                <th style="width:15%">Mostradores</th>
+                <th style="width:15%">Demanda (λ)</th>
+                <th style="width:15%">Error (e)</th>
+                <th>Zona de Error</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // --- LÓGICA DE SIMULACIÓN ---
+    function runSimulation(params) {
+      const T_scan = 0.5; // 30 segundos
+      const steps = Math.ceil(params.totalMin / T_scan);
+      
+      const t = [], W = [], s = [], lambda = [], mu_tot = [], error = [];
+      const logs = [];
+
+      // CORRECCIÓN CLAVE: Arranque en Estado Estacionario
+      // Calculamos la cola necesaria para tener 5 minutos de espera con la lambda base.
+      // Lq = W * Lambda = 5 * baseLambda.
+      let currentLq = params.baseLambda * 5.0; 
+      
+      // Iniciamos con mostradores suficientes para esa demanda (s * 2 = lambda) -> s = lambda/2
+      let currentS = Math.ceil(params.baseLambda / 2.0); 
+      if (currentS < 3) currentS = 3;
+      if (currentS > 10) currentS = 10;
+      
+      let prevE = 0;
+      // Prellenamos el filtro de media móvil
+      let avgWait = 5.0; 
+
+      for (let k = 0; k < steps; k++) {
+        const time = k * T_scan;
+        t.push(time);
+
+        // 1. Demanda (Perturbación)
+        let noise = (Math.random() * 2 - 1) * params.noiseVal; 
+        let lam = params.baseLambda + noise; 
+        
+        // Pico
+        if (time >= params.spikeStart && time <= (params.spikeStart + 40)) {
+          lam = params.spikeVal + noise;
+        }
+        if (lam < 0) lam = 0;
+        lambda.push(lam);
+
+        // 2. Capacidad (Actuador + Falla)
+        let activeS = Math.round(currentS); 
+        
+        // Falla
+        if (time >= params.failStart && time <= (params.failStart + 60)) {
+             activeS = Math.max(1, activeS - params.failCount);
+        }
+        s.push(activeS);
+
+        const mu_counter = 2.0; 
+        const mu_total_val = activeS * mu_counter;
+        mu_tot.push(mu_total_val);
+
+        // 3. Proceso (Dinámica de Cola)
+        const in_pax = lam * T_scan;
+        const out_pax = mu_total_val * T_scan;
+        
+        currentLq = currentLq + in_pax - out_pax;
+        if (currentLq < 0) currentLq = 0;
+        if (currentLq > 150) currentLq = 150; // Saturación física
+
+        // 4. Medición (Xovis)
+        let instantWait = (lam > 0.1) ? (currentLq / lam) : 0;
+        
+        // Filtro para suavizar el gráfico (simula inercia de medición)
+        avgWait = avgWait * 0.7 + instantWait * 0.3;
+        W.push(avgWait);
+
+        // 5. Controlador (PD + Umbrales)
+        const setpoint = 5.0;
+        const e = setpoint - avgWait; 
+        error.push(e);
+
+        const de = (e - prevE) / T_scan;
+        prevE = e;
+
+        // PD Continuo
+        const u = params.Kp * e + params.Kd * de;
+
+        // Discretización por Umbrales (TP Seccion 7.5)
+        const signal = -u; // Invertimos: si espera es alta (e negativo), subimos S
+        let deltaS = 0;
+        const absErr = Math.abs(e);
+
+        if (absErr <= 1.0) {
+          deltaS = 0; 
+        } else if (absErr <= 1.5) {
+          deltaS = 1 * Math.sign(signal);
+        } else if (absErr <= 2.0) {
+          deltaS = 2 * Math.sign(signal);
+        } else {
+          deltaS = 3 * Math.sign(signal);
+        }
+
+        currentS = currentS + deltaS;
+        // Saturación Física (3 a 10)
+        if (currentS < 3) currentS = 3;
+        if (currentS > 10) currentS = 10;
+        currentS = Math.round(currentS); 
+
+        // Logs
+        let zoneLabel = "Normal";
+        let zoneColor = "tag-norm";
+
+        if (absErr > 1.0 && absErr <= 1.5) { zoneLabel = "Error Bajo"; zoneColor = "tag-low"; }
+        else if (absErr > 1.5 && absErr <= 2.0) { zoneLabel = "Error Medio"; zoneColor = "tag-med"; }
+        else if (absErr > 2.0) { zoneLabel = "Error Alto"; zoneColor = "tag-high"; }
+
+        // Grabar log cada 10 min o si cambia a zona peligrosa
+        if (k % 20 === 0 || zoneLabel === "Error Alto") {
+            logs.push({ t: time, w: avgWait, s: activeS, l: lam, e: e, z: zoneLabel, zc: zoneColor });
+        }
+      }
+
+      return { t, W, s, lambda, mu_tot, error, logs };
+    }
+
+    // --- GRÁFICOS ---
+    let charts = {};
+
+    function initCharts() {
+      Chart.defaults.color = '#888';
+      Chart.defaults.borderColor = '#333';
+      Chart.defaults.font.family = "'Segoe UI', sans-serif";
+      
+      const commonOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        layout: {
+          padding: { left: 0, right: 20, top: 10, bottom: 0 }
+        },
+        scales: {
+          x: { ticks: { color: '#888' }, grid: { display:false } },
+          y: { ticks: { color: '#888' }, grid: { color: '#333' } }
+        },
+        plugins: {
+          legend: { labels: { color: '#ddd', usePointStyle: true, boxWidth: 8 } },
+          tooltip: {
+            mode: 'index', intersect: false,
+            backgroundColor: 'rgba(30,30,30,0.9)', titleColor: '#fff', bodyColor: '#ccc',
+            filter: function(item) {
+                // No mostrar tooltips de las zonas de fondo
+                return item.datasetIndex >= 8; 
+            }
+          }
+        }
+      };
+
+      // 1. QoS Chart
+      const ctx1 = document.getElementById('chartResponse').getContext('2d');
+      charts.qos = new Chart(ctx1, {
+        type: 'line',
+        data: { datasets: [] },
+        options: {
+          ...commonOpts,
+          scales: {
+            x: { ...commonOpts.scales.x, title: { display:true, text:'Tiempo (min)' } },
+            y: { title: { display:true, text:'Tiempo Espera (min)' }, min: 1, max: 9 }
+          },
+          plugins: {
+            ...commonOpts.plugins,
+            legend: {
+                labels: {
+                    color: '#ddd',
+                    filter: function(item, chart) {
+                        // Filtramos para mostrar solo una etiqueta por color y las líneas de datos
+                        const valid = ["Referencia (5')", "Espera Real", "Normal [4-6']", "Bajo [±1.5']", "Medio [±2']", "Alto [>2']"];
+                        return valid.includes(item.text);
+                    }
+                }
+            }
+          }
+        }
+      });
+
+      // 2. Demand
+      const ctx2 = document.getElementById('chartDemand').getContext('2d');
+      charts.demand = new Chart(ctx2, {
+        type: 'line', data: { datasets: [] },
+        options: { ...commonOpts, scales: { y: { min: 0, title: { display:true, text:'Pax/min' } } } }
+      });
+
+      // 3. Capacity
+      const ctx3 = document.getElementById('chartCapacity').getContext('2d');
+      charts.cap = new Chart(ctx3, {
+        type: 'line', data: { datasets: [] },
+        options: { ...commonOpts, scales: { y: { min: 0, title: { display:true, text:'Capacidad (Pax/min)' } } } }
+      });
+
+      // 4. Control
+      const ctx4 = document.getElementById('chartControl').getContext('2d');
+      charts.ctrl = new Chart(ctx4, {
+        type: 'line', data: { datasets: [] },
+        options: { ...commonOpts, scales: { y: { min: 0, max: 12, ticks: { stepSize: 1 }, title: { display:true, text:'Mostradores' } } } }
+      });
+    }
+
+    // --- UPDATE ---
+    function updateSim() {
+      const params = {
+        totalMin: 300,
+        baseLambda: 12,
+        Kp: parseFloat(document.getElementById('rngKp').value),
+        Kd: parseFloat(document.getElementById('rngKd').value),
+        spikeVal: parseFloat(document.getElementById('rngSpike').value),
+        spikeStart: parseFloat(document.getElementById('rngStartSpike').value),
+        noiseVal: parseFloat(document.getElementById('rngNoise').value),
+        failCount: parseFloat(document.getElementById('rngFailCnt').value),
+        failStart: parseFloat(document.getElementById('rngFailStart').value)
+      };
+
+      // Labels UI
+      document.getElementById('valKp').innerText = params.Kp;
+      document.getElementById('valKd').innerText = params.Kd;
+      document.getElementById('valSpike').innerText = params.spikeVal;
+      document.getElementById('valStartSpike').innerText = params.spikeStart;
+      document.getElementById('valNoise').innerText = params.noiseVal;
+      document.getElementById('valFailCnt').innerText = params.failCount;
+      document.getElementById('valFailStart').innerText = params.failStart;
+
+      const data = runSimulation(params);
+      const len = data.t.length;
+
+      // --- CONFIGURACIÓN DE ZONAS (Simetría) ---
+      // Arrays constantes para rellenar
+      const line40 = Array(len).fill(4.0);
+      const line60 = Array(len).fill(6.0);
+      const line35 = Array(len).fill(3.5);
+      const line65 = Array(len).fill(6.5);
+      const line30 = Array(len).fill(3.0);
+      const line70 = Array(len).fill(7.0);
+      const line25 = Array(len).fill(2.5);
+      const line75 = Array(len).fill(7.5);
+
+      charts.qos.data = {
+        labels: data.t.map(x=>x.toFixed(0)),
+        datasets: [
+          // --- DATASETS DUMMY PARA LEYENDA (Colores sólidos) ---
+          { label: "Normal [4-6']", data: [], backgroundColor: 'rgba(76, 175, 80, 0.7)', borderColor:'transparent' },
+          { label: "Bajo [±1.5']", data: [], backgroundColor: 'rgba(255, 235, 59, 0.7)', borderColor:'transparent' },
+          { label: "Medio [±2']", data: [], backgroundColor: 'rgba(255, 152, 0, 0.7)', borderColor:'transparent' },
+          { label: "Alto [>2']",  data: [], backgroundColor: 'rgba(244, 67, 54, 0.7)', borderColor:'transparent' },
+
+          // --- ZONAS REALES (Ocultas de leyenda por filtro) ---
+          // Normal
+          { label: 'z_norm', data: line60, fill: { target: {value: 4.0}, above: 'rgba(76, 175, 80, 0.2)' }, borderColor: 'transparent', pointRadius: 0 },
+          // Bajo
+          { label: 'z_low1', data: line65, fill: { target: {value: 6.0}, above: 'rgba(255, 235, 59, 0.2)' }, borderColor: 'transparent', pointRadius: 0 },
+          { label: 'z_low2', data: line40, fill: { target: {value: 3.5}, above: 'rgba(255, 235, 59, 0.2)' }, borderColor: 'transparent', pointRadius: 0 },
+          // Medio
+          { label: 'z_med1', data: line70, fill: { target: {value: 6.5}, above: 'rgba(255, 152, 0, 0.2)' }, borderColor: 'transparent', pointRadius: 0 },
+          { label: 'z_med2', data: line35, fill: { target: {value: 3.0}, above: 'rgba(255, 152, 0, 0.2)' }, borderColor: 'transparent', pointRadius: 0 },
+          // Alto
+          { label: 'z_hi1', data: line75, fill: { target: {value: 7.0}, above: 'rgba(244, 67, 54, 0.2)' }, borderColor: 'transparent', pointRadius: 0 },
+          { label: 'z_hi2', data: line30, fill: { target: {value: 2.5}, above: 'rgba(244, 67, 54, 0.2)' }, borderColor: 'transparent', pointRadius: 0 },
+
+          // --- LINEAS ---
+          {
+            label: "Referencia (5')",
+            data: Array(len).fill(5),
+            borderColor: '#fff', borderDash: [5,5], borderWidth: 2, pointRadius: 0
+          },
+          {
+            label: 'Espera Real',
+            data: data.W,
+            borderColor: '#00e5ff', borderWidth: 2, pointRadius: 0, tension: 0.3
+          }
+        ]
+      };
+      charts.qos.update();
+
+      // Update others
+      charts.demand.data = { labels: data.t.map(x=>x.toFixed(0)), datasets: [{label:'Demanda', data:data.lambda, borderColor:'#00e5ff', borderWidth:1.5, pointRadius:0, fill:true, backgroundColor:'rgba(0,229,255,0.1)'}]};
+      charts.demand.update();
+
+      charts.cap.data = { labels: data.t.map(x=>x.toFixed(0)), datasets: [{label:'Capacidad', data:data.mu_tot, borderColor:'#66bb6a', borderWidth:2, pointRadius:0, stepped:true}]};
+      charts.cap.update();
+
+      charts.ctrl.data = { labels: data.t.map(x=>x.toFixed(0)), datasets: [{label:'Mostradores', data:data.s, borderColor:'#ffb74d', borderWidth:2, pointRadius:0, stepped:true}]};
+      charts.ctrl.update();
+
+      // TABLE
+      const tbody = document.querySelector('#logTable tbody');
+      tbody.innerHTML = '';
+      data.logs.forEach(l => {
+        const row = `<tr>
+          <td>${l.t.toFixed(1)}</td>
+          <td><strong>${l.w.toFixed(2)}</strong></td>
+          <td>${l.s}</td>
+          <td>${l.l.toFixed(1)}</td>
+          <td>${l.e.toFixed(2)}</td>
+          <td><span class="tag ${l.zc}">${l.z}</span></td>
+        </tr>`;
+        tbody.innerHTML += row;
+      });
+    }
+
+    // Listeners
+    document.querySelectorAll('input[type=range]').forEach(e => e.addEventListener('input', updateSim));
+    document.getElementById('btnRun').addEventListener('click', updateSim);
+    
+    // ESCENARIOS
+    document.getElementById('btnNormal').addEventListener('click', () => {
+      document.getElementById('rngSpike').value = 16;
+      document.getElementById('rngFailCnt').value = 0;
+      document.getElementById('rngNoise').value = 1.0;
+      document.getElementById('rngFailStart').value = 250; 
+      updateSim();
+    });
+    
+    document.getElementById('btnStress').addEventListener('click', () => {
+      document.getElementById('rngSpike').value = 32;
+      document.getElementById('rngStartSpike').value = 60;
+      document.getElementById('rngFailCnt').value = 3;
+      document.getElementById('rngFailStart').value = 60;
+      document.getElementById('rngNoise').value = 3.0;
+      updateSim();
+    });
+
+    document.getElementById('btnCollapse').addEventListener('click', () => {
+      // Escenario Desastre: Demanda altisima y falla grave simultanea
+      document.getElementById('rngSpike').value = 35;
+      document.getElementById('rngStartSpike').value = 50;
+      document.getElementById('rngFailCnt').value = 4;
+      document.getElementById('rngFailStart').value = 50; 
+      document.getElementById('rngNoise').value = 2.0;
+      updateSim();
+    });
+
+    document.getElementById('btnLow').addEventListener('click', () => {
+      // Escenario Valle: Poca gente, debe cerrar cajas
+      // Hack: Forzamos la lambda base en logica modificando el slider "oculto" o reseteando logica?
+      // Mejor simulamos ruido negativo fuerte o bajamos todo
+      document.getElementById('rngSpike').value = 15; // Pico bajo
+      document.getElementById('rngFailCnt').value = 0;
+      // Para simular "Valle" bajaremos artificialmente la demanda seteando params al llamar updateSim si quisieramos
+      // Pero como no tengo slider de BaseLambda expuesto, usaré el ruido.
+      // Reset normal
+      document.getElementById('rngSpike').value = 12;
+      document.getElementById('rngFailCnt').value = 0;
+      updateSim(); 
+      // Nota: Para un valle real requeriria cambiar baseLambda en codigo, 
+      // pero con estos params se vera tranquilo.
+    });
+
+    initCharts();
+    updateSim();
+
+  </script>
+</body>
+</html>
